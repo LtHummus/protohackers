@@ -30,9 +30,9 @@ func init() {
 }
 
 func handleConnection(conn net.Conn) {
+	defer conn.Close()
+	read := bufio.NewReader(conn)
 	for {
-		defer conn.Close()
-		read := bufio.NewReader(conn)
 		line, err := read.ReadString('\n')
 		if err != nil {
 			log.Error().Err(err).Msg("could not read")
@@ -71,6 +71,7 @@ func handleConnection(conn net.Conn) {
 		} else {
 			conn.Write(noPrimeResponse)
 		}
+
 	}
 
 }
