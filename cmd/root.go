@@ -22,7 +22,7 @@ func init() {
 
 	rootCmd.PersistentFlags().IntVarP(&port, "port", "p", 28172, "port to listen on")
 
-	rootCmd.AddCommand(smokeTestCmd, primeCommand)
+	rootCmd.AddCommand(smokeTestCmd, primeCommand, meansCommand)
 }
 
 var rootCmd = &cobra.Command{
