@@ -50,7 +50,7 @@ func (c *Client) handleConnection() {
 			if count != 0 {
 				avg = int32(total / count)
 			}
-			
+
 			log.Info().Int32("average", avg).Msg("sending response")
 
 			err = binary.Write(c.conn, binary.BigEndian, avg)
