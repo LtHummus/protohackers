@@ -2,6 +2,7 @@ package smoke
 
 import (
 	"fmt"
+	"io"
 	"net"
 
 	"github.com/rs/zerolog/log"
@@ -10,15 +11,9 @@ import (
 const BufferSizeBytes = 32 * 1024 * 1024
 
 func handleConnection(conn net.Conn) {
-	buf := make([]byte, BufferSizeBytes)
-	len, err := conn.Read(buf)
+	_, err := io.Copy(conn, conn)
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not read")
-	}
-
-	_, err = conn.Write(buf[:len])
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not write")
+		log.Fatal().Err(err).Msg("could not copy")
 	}
 
 	conn.Close()
