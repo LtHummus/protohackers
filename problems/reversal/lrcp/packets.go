@@ -1,7 +1,6 @@
 package lrcp
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"github.com/rs/zerolog/log"
@@ -110,15 +109,29 @@ func (cp *ClosePacket) String() string {
 
 func decodePacket(data []byte) (Packet, error) {
 	log.Debug().Str("raw_packet", string(data)).Msg("beginning raw packet decode")
+
 	if len(data) < 2 || len(data) > 1000 {
 		return nil, errors.New("invalid size")
 	}
 
-	if data[0] != '/' || data[len(data)-1] != '/' {
-		return nil, errors.New("invalid preamble or postamble")
+	if data[0] != '/' {
+		return nil, errors.New("invalid preamble")
 	}
 
-	parts := bytes.SplitN(data[1:len(data)-1], []byte{'/'}, 4)
+	lastSlash := 0
+	var parts [][]byte
+	for i := 1; i < len(data); i++ {
+		if data[i] == '\\' {
+			i++
+		} else if data[i] == '/' {
+			parts = append(parts, data[lastSlash+1:i])
+			lastSlash = i
+		}
+	}
+
+	if lastSlash != len(data)-1 {
+		return nil, errors.New("does not end with slash")
+	}
 	if len(parts) < 2 {
 		return nil, errors.New("could not split parts")
 	}
@@ -210,14 +223,15 @@ func escape(x []byte) []byte {
 	return res
 }
 
-func unescape(x []byte) []byte {
-	res := make([]byte, 0)
-	for i := 0; i < len(x); i++ {
-		// skip the escape character
-		if x[i] == '\\' {
+func unescape(data []byte) []byte {
+	buf := []byte{}
+	for i := 0; i < len(data); i++ {
+		if data[i] != '\\' {
+			buf = append(buf, data[i])
+		} else {
 			i++
+			buf = append(buf, data[i])
 		}
-		res = append(res, x[i])
 	}
-	return res
+	return buf
 }

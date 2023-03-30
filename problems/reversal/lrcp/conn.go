@@ -26,6 +26,10 @@ type Conn struct {
 	bytesSent int
 }
 
+func (c *Conn) SessionID() int {
+	return c.sessionID
+}
+
 func (c *Conn) Read(b []byte) (int, error) {
 	c.recvLock.L.Lock()
 	if c.recvBuff.Len() == 0 {
@@ -59,6 +63,10 @@ func (c *Conn) setClose() {
 }
 
 func (c *Conn) sendData(b []byte, pos int) {
+	if c.isClosed {
+		log.Warn().Int("session", c.sessionID).Msg("not sending on closed session")
+		return
+	}
 	size := 800
 	for i := 0; i < len(b); i += size {
 		end := i + size

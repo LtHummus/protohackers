@@ -28,7 +28,7 @@ func handleConnection(conn *lrcp.Conn) {
 	scanner := bufio.NewScanner(conn)
 	for scanner.Scan() {
 		l := scanner.Bytes()
-		log.Info().Str("line", string(l)).Msg("read line")
+		log.Info().Str("line", string(l)).Int("session", conn.SessionID()).Msg("read line")
 		rev := reverse(l)
 		rev = append(rev, '\n')
 		_, err := conn.Write(rev)
