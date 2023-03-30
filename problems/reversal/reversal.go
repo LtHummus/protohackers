@@ -1,41 +1,40 @@
 package reversal
 
 import (
+	"bufio"
 	"fmt"
+	"github.com/lthummus/protohackers/problems/reversal/lrcp"
 	"github.com/rs/zerolog/log"
-	"net"
 )
 
 func RunReversal(port int) {
-	addr, err := net.ResolveUDPAddr("udp", fmt.Sprintf(":%d", port))
+	log.Info().Int("port", port).Msg("starting server")
+	l, err := lrcp.Listen(fmt.Sprintf(":%d", port))
 	if err != nil {
-		log.Fatal().Err(err).Msg("could not resolve udp address")
+		log.Fatal().Err(err).Msg("could not listen:")
 	}
 
-	conn, err := net.ListenUDP("udp", addr)
-	if err != nil {
-		log.Fatal().Err(err).Msg("could not start server")
-	}
-
-	log.Info().Int("port", port).Msg("listening")
-
-	defer conn.Close()
-	buf := make([]byte, 1024)
 	for {
-		n, raddr, err := conn.ReadFromUDP(buf)
+		conn, err := l.Accept()
 		if err != nil {
-			log.Error().Err(err).Msg("could not read from UDP socket")
-			continue
+			log.Fatal().Err(err).Msg("could not accept")
 		}
 
-		log.Trace().Int("len", n).Stringer("remote_address", raddr).Msg("packet recieved")
+		go handleConnection(conn)
+	}
+}
 
-		packet, err := decodePacket(buf[:n])
+func handleConnection(conn *lrcp.Conn) {
+	scanner := bufio.NewScanner(conn)
+	for scanner.Scan() {
+		l := scanner.Bytes()
+		log.Info().Str("line", string(l)).Msg("read line")
+		rev := reverse(l)
+		rev = append(rev, '\n')
+		_, err := conn.Write(rev)
 		if err != nil {
-			log.Warn().Err(err).Msg("invalid packet")
-			continue
+			log.Error().Err(err).Msg("could not write response")
+			return
 		}
-
-		log.Info().Stringer("packet", packet).Msg("packet got")
 	}
 }

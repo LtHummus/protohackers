@@ -1,4 +1,4 @@
-package reversal
+package lrcp
 
 import (
 	"bytes"
@@ -16,13 +16,18 @@ const (
 )
 
 type Packet interface {
+	fmt.Stringer
 	Serialize() []byte
 	Kind() string
-	String() string
+	SessionID() int
 }
 
 type ConnectPacket struct {
 	Session int
+}
+
+func (cp *ConnectPacket) SessionID() int {
+	return cp.Session
 }
 
 func (cp *ConnectPacket) Serialize() []byte {
@@ -44,10 +49,14 @@ type DataPacket struct {
 }
 
 func (dp *DataPacket) Serialize() []byte {
-	packet := []byte(fmt.Sprintf("/data/%s/%d/", dp.Session, dp.Position))
-	packet = append(packet, dp.Data...)
+	packet := []byte(fmt.Sprintf("/data/%d/%d/", dp.Session, dp.Position))
+	packet = append(packet, escape(dp.Data)...)
 	packet = append(packet, '/')
 	return packet
+}
+
+func (dp *DataPacket) SessionID() int {
+	return dp.Session
 }
 
 func (dp *DataPacket) Kind() string {
@@ -63,8 +72,12 @@ type AckPacket struct {
 	Length  int
 }
 
+func (ap *AckPacket) SessionID() int {
+	return ap.Session
+}
+
 func (ap *AckPacket) Serialize() []byte {
-	return []byte(fmt.Sprintf("/connect/%d/", ap.Session))
+	return []byte(fmt.Sprintf("/ack/%d/%d/", ap.Session, ap.Length))
 }
 
 func (ap *AckPacket) Kind() string {
@@ -79,8 +92,12 @@ type ClosePacket struct {
 	Session int
 }
 
+func (cp *ClosePacket) SessionID() int {
+	return cp.Session
+}
+
 func (cp *ClosePacket) Serialize() []byte {
-	return []byte(fmt.Sprintf("/connect/%d/", cp.Session))
+	return []byte(fmt.Sprintf("/close/%d/", cp.Session))
 }
 
 func (cp *ClosePacket) Kind() string {
@@ -92,6 +109,7 @@ func (cp *ClosePacket) String() string {
 }
 
 func decodePacket(data []byte) (Packet, error) {
+	log.Debug().Str("raw_packet", string(data)).Msg("beginning raw packet decode")
 	if len(data) < 2 || len(data) > 1000 {
 		return nil, errors.New("invalid size")
 	}
@@ -159,7 +177,7 @@ func decodePacket(data []byte) (Packet, error) {
 		return &DataPacket{
 			Session:  session,
 			Position: pos,
-			Data:     parts[3],
+			Data:     unescape(parts[3]),
 		}, nil
 	default:
 		log.Warn().Str("kind", packetKind).Msg("invalid packet time")
@@ -175,4 +193,31 @@ func parseSession(data []byte) (int, error) {
 	}
 
 	return id, nil
+}
+
+func escape(x []byte) []byte {
+	res := make([]byte, 0)
+	for _, c := range x {
+		if c == '/' {
+			res = append(res, `\/`...)
+		} else if c == '\\' {
+			res = append(res, `\\`...)
+		} else {
+			res = append(res, c)
+		}
+	}
+
+	return res
+}
+
+func unescape(x []byte) []byte {
+	res := make([]byte, 0)
+	for i := 0; i < len(x); i++ {
+		// skip the escape character
+		if x[i] == '\\' {
+			i++
+		}
+		res = append(res, x[i])
+	}
+	return res
 }
