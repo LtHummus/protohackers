@@ -23,7 +23,7 @@ func init() {
 	rootCmd.PersistentFlags().IntVarP(&port, "port", "p", 28172, "port to listen on")
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
 
-	rootCmd.AddCommand(smokeTestCmd, primeCommand, meansCommand, chatCommand, databaseCommand, mobCommand, speedCommand, speedTestCmd, reversalCommand, insecureCommand)
+	rootCmd.AddCommand(smokeTestCmd, primeCommand, meansCommand, chatCommand, databaseCommand, mobCommand, speedCommand, speedTestCmd, reversalCommand, insecureCommand, jobsCommand)
 
 	cobra.OnInitialize(func() {
 		if verbose {
