@@ -25,9 +25,6 @@ func NewServer() *Server {
 }
 
 func (s *Server) GetOrCreateQueue(name string) *Queue {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	q := s.Queues[name]
 	if q != nil {
 		return q
@@ -39,6 +36,13 @@ func (s *Server) GetOrCreateQueue(name string) *Queue {
 
 	s.Queues[name] = q
 	return q
+}
+
+func (s *Server) QueueJob(queue string, je *JobEntry) {
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	s.GetOrCreateQueue(queue).QueueJob(je)
 }
 
 func (s *Server) FindJob(queues []string) *JobEntry {

@@ -4,7 +4,6 @@ import (
 	"container/heap"
 	"github.com/rs/zerolog/log"
 	"math/rand"
-	"sync"
 	"time"
 )
 
@@ -37,8 +36,6 @@ type JobEntry struct {
 type Queue struct {
 	Name string
 	Jobs *JobList
-
-	lock sync.Mutex
 }
 
 func NewQueue(name string) *Queue {
@@ -52,9 +49,6 @@ func NewQueue(name string) *Queue {
 }
 
 func (q *Queue) NextJob() *JobEntry {
-	q.lock.Lock()
-	defer q.lock.Unlock()
-
 	if q.Jobs.Len() == 0 {
 		return nil
 	}
@@ -64,18 +58,14 @@ func (q *Queue) NextJob() *JobEntry {
 }
 
 func (q *Queue) QueueJob(je *JobEntry) *JobEntry {
-	q.lock.Lock()
-	defer q.lock.Unlock()
 
 	heap.Push(q.Jobs, je)
-	log.Info().Str("queue", q.Name).Int("priority", je.Priority).Uint64("job_id", je.Id).Msg("queued job")
+	log.Debug().Str("queue", q.Name).Int("priority", je.Priority).Uint64("job_id", je.Id).Msg("queued job")
 
 	return je
 }
 
 func (q *Queue) DeleteJob(id uint64) bool {
-	q.lock.Lock()
-	defer q.lock.Unlock()
 
 	for i := 0; i < q.Jobs.Len(); i++ {
 		j := q.Jobs.Get(i)
@@ -91,8 +81,6 @@ func (q *Queue) DeleteJob(id uint64) bool {
 }
 
 func (q *Queue) PeekJob() *JobEntry {
-	q.lock.Lock()
-	defer q.lock.Unlock()
 
 	if q.Jobs.Len() == 0 {
 		return nil
