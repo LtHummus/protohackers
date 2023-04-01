@@ -29,7 +29,7 @@ func init() {
 		if verbose {
 			zerolog.SetGlobalLevel(zerolog.TraceLevel)
 		} else {
-			zerolog.SetGlobalLevel(zerolog.InfoLevel)
+			zerolog.SetGlobalLevel(zerolog.WarnLevel)
 		}
 		log.Trace().Msg("verbose logging enabled")
 

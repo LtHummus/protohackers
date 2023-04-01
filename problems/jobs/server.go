@@ -4,24 +4,55 @@ import (
 	"errors"
 	"github.com/rs/zerolog/log"
 	"sync"
+	"time"
 )
 
 var (
 	ErrQueueExists = errors.New("queue already exists")
 )
 
+type awaitingClients struct {
+	client *Client
+	queues []string
+}
+
 type Server struct {
 	Queues  map[string]*Queue
 	Clients map[uint64]*Client
+
+	pendingClients    map[uint64]awaitingClients
+	pendingClientLock sync.Mutex
 
 	lock sync.Mutex
 }
 
 func NewServer() *Server {
-	return &Server{
+	s := &Server{
 		Queues:  map[string]*Queue{},
 		Clients: map[uint64]*Client{},
+
+		pendingClients: map[uint64]awaitingClients{},
 	}
+
+	go func() {
+		for {
+			time.Sleep(500 * time.Millisecond)
+			s.pendingClientLock.Lock()
+
+			for _, curr := range s.pendingClients {
+				j := s.FindJob(curr.queues)
+				if j != nil {
+					log.Info().Uint64("client_id", curr.client.Id).Uint64("job_id", j.Id).Msg("assigning awaiting client job")
+					curr.client.writeJobExternal(j)
+					delete(s.pendingClients, curr.client.Id)
+				}
+			}
+
+			s.pendingClientLock.Unlock()
+		}
+	}()
+
+	return s
 }
 
 func (s *Server) GetOrCreateQueue(name string) *Queue {
@@ -108,4 +139,23 @@ func (s *Server) DeregisterClient(c *Client) {
 	defer s.lock.Unlock()
 
 	delete(s.Clients, c.Id)
+}
+
+func (s *Server) AwaitForJob(c *Client, queues []string) {
+	s.pendingClientLock.Lock()
+	defer s.pendingClientLock.Unlock()
+
+	log.Info().Uint64("client_id", c.Id).Msg("adding ourselves as a waiting client")
+
+	s.pendingClients[c.Id] = awaitingClients{
+		client: c,
+		queues: queues,
+	}
+}
+
+func (s *Server) UnawaitForJob(c *Client) {
+	s.pendingClientLock.Lock()
+	defer s.pendingClientLock.Unlock()
+
+	delete(s.pendingClients, c.Id)
 }

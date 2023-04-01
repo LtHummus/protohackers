@@ -3,9 +3,7 @@ package jobs
 import (
 	"bufio"
 	"github.com/rs/zerolog/log"
-	"math/rand"
 	"net"
-	"time"
 )
 
 type Client struct {
@@ -56,6 +54,7 @@ func (c *Client) handleConnection() {
 	log.Info().Stringer("remote_addr", c.Conn.RemoteAddr()).Msg("client disconnected")
 
 	c.closed = true
+	c.Server.UnawaitForJob(c)
 	for _, curr := range c.AssignedJobs {
 		c.Server.QueueJob(curr.Queue, curr)
 		log.Info().Uint64("id", curr.Id).Str("queue_name", curr.Queue).Msg("requeued job")
@@ -92,6 +91,23 @@ func (c *Client) handlePutMessage(p *PutRequest) {
 	c.Conn.Write(response)
 }
 
+func (c *Client) writeJobExternal(j *JobEntry) {
+	c.assignJob(j)
+	response, err := serializeMessage(&GetResponse{
+		Status:   "ok",
+		Id:       j.Id,
+		Job:      j.Job,
+		Priority: j.Priority,
+		Queue:    j.Queue,
+	})
+	if err != nil {
+		log.Error().Err(err).Msg("could not serialize job response")
+		return
+	}
+	log.Info().Uint64("client_id", c.Id).Uint64("job_id", j.Id).Msg("assigning from thread")
+	c.Conn.Write(response)
+}
+
 func (c *Client) handleGetMessage(g *GetRequest) {
 	log.Trace().Strs("queue_names", g.Queues).Bool("wait", g.Wait).Msg("got get request")
 
@@ -101,40 +117,7 @@ func (c *Client) handleGetMessage(g *GetRequest) {
 	}
 
 	if g.Wait {
-		go func() {
-			count := 0
-			log.Info().Uint64("client_id", c.Id).Strs("queues", g.Queues).Msg("starting wait thread")
-			for {
-				count++
-				if c.closed {
-					break
-				}
-				time.Sleep(time.Duration(3+rand.Intn(4)) * time.Second)
-				log.Trace().Int("count", count).Uint64("client_id", c.Id).Strs("queues", g.Queues).Msg("looking for jobs in wait thread")
-				j := c.Server.FindJob(g.Queues)
-				if j != nil {
-					log.Trace().Uint64("client_id", c.Id).Strs("queues", g.Queues).Msg("found a job in wait thread")
-					c.assignJob(j)
-					response, err := serializeMessage(&GetResponse{
-						Status:   "ok",
-						Id:       j.Id,
-						Job:      j.Job,
-						Priority: j.Priority,
-						Queue:    j.Queue,
-					})
-					if err != nil {
-						log.Error().Err(err).Msg("could not serialize job response")
-						return
-					}
-					log.Info().Int("count", count).Uint64("client_id", c.Id).Uint64("job_id", j.Id).Msg("assigning from thread")
-					c.Conn.Write(response)
-					return
-				} else {
-					log.Trace().Int("count", count).Uint64("client_id", c.Id).Strs("queues", g.Queues).Msg("no job found")
-				}
-			}
-			log.Warn().Uint64("client_id", c.Id).Int("count", count).Msg("stopping job wait thread on disconnect")
-		}()
+		c.Server.AwaitForJob(c, g.Queues)
 	} else {
 		j := c.Server.FindJob(g.Queues)
 		if j != nil {
