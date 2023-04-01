@@ -13,6 +13,7 @@ import (
 
 var port int
 var verbose bool
+var quiet bool
 
 func init() {
 	log.Logger = log.Output(zerolog.ConsoleWriter{
@@ -21,15 +22,18 @@ func init() {
 	})
 
 	rootCmd.PersistentFlags().IntVarP(&port, "port", "p", 28172, "port to listen on")
-	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging")
+	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging (supersedes quiet)")
+	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet logging")
 
 	rootCmd.AddCommand(smokeTestCmd, primeCommand, meansCommand, chatCommand, databaseCommand, mobCommand, speedCommand, speedTestCmd, reversalCommand, insecureCommand, jobsCommand)
 
 	cobra.OnInitialize(func() {
 		if verbose {
 			zerolog.SetGlobalLevel(zerolog.TraceLevel)
-		} else {
+		} else if quiet {
 			zerolog.SetGlobalLevel(zerolog.WarnLevel)
+		} else {
+			zerolog.SetGlobalLevel(zerolog.InfoLevel)
 		}
 		log.Trace().Msg("verbose logging enabled")
 
