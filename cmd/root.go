@@ -25,7 +25,18 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&verbose, "verbose", "v", false, "verbose logging (supersedes quiet)")
 	rootCmd.PersistentFlags().BoolVarP(&quiet, "quiet", "q", false, "quiet logging")
 
-	rootCmd.AddCommand(smokeTestCmd, primeCommand, meansCommand, chatCommand, databaseCommand, mobCommand, speedCommand, speedTestCmd, reversalCommand, insecureCommand, jobsCommand)
+	rootCmd.AddCommand(smokeTestCmd,
+		primeCommand,
+		meansCommand,
+		chatCommand,
+		databaseCommand,
+		mobCommand,
+		speedCommand,
+		speedTestCmd,
+		reversalCommand,
+		insecureCommand,
+		jobsCommand,
+		vcsCommand)
 
 	cobra.OnInitialize(func() {
 		if verbose {
