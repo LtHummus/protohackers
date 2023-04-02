@@ -36,7 +36,8 @@ func init() {
 		reversalCommand,
 		insecureCommand,
 		jobsCommand,
-		vcsCommand)
+		vcsCommand,
+		pestCommand)
 
 	cobra.OnInitialize(func() {
 		if verbose {
