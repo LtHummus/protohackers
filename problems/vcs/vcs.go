@@ -45,6 +45,8 @@ func handleConnection(conn net.Conn) {
 			handleList(conn, parts)
 		case "PUT":
 			handlePut(conn, parts)
+		case "GET":
+			handleGet(conn, parts)
 		default:
 			conn.Write([]byte(fmt.Sprintf("ERR illegal method: %s\n", parts[0])))
 			break
@@ -85,7 +87,20 @@ func handlePut(conn net.Conn, parts []string) {
 	}
 
 	log.Info().Str("name", filename).Int("len", length).Msg("putting file")
-	r, err := fs.Put(filename, []byte("foo"))
+
+	buf := make([]byte, length)
+	n, err := conn.Read(buf)
+	if err != nil {
+		log.Error().Err(err).Msg("could not read contents")
+		return
+	}
+	if n != length {
+		log.Error().Err(err).Msg("could not read contents")
+		conn.Write([]byte("ERR insufficient data"))
+		return
+	}
+
+	r, err := fs.Put(filename, buf)
 	if err != nil {
 		log.Error().Err(err).Msg("could not put")
 		conn.Write([]byte(fmt.Sprintf("ERR %s\n", err.Error())))
@@ -93,6 +108,28 @@ func handlePut(conn net.Conn, parts []string) {
 	}
 
 	conn.Write([]byte(fmt.Sprintf("OK %s\n", r)))
+}
+
+func handleGet(conn net.Conn, parts []string) {
+	if len(parts) < 2 || len(parts) > 3 {
+		conn.Write([]byte("ERR usage: GET file [revision]"))
+		return
+	}
+
+	filename := parts[1]
+	revision := ""
+	if len(parts) == 3 {
+		revision = parts[2]
+	}
+
+	contents, err := fs.Get(filename, revision)
+	if err != nil {
+		conn.Write([]byte(fmt.Sprintf("ERR %s\n", err.Error())))
+		return
+	}
+
+	conn.Write([]byte(fmt.Sprintf("OK %d\n", len(contents))))
+	conn.Write(contents)
 }
 
 func RunVCS(port int) {

@@ -3,8 +3,16 @@ package filesystem
 type Dir struct {
 	Name string
 
-	Subdirs []*Dir
-	Files   []*File
+	Subdirs map[string]*Dir
+	Files   map[string]*File
+}
+
+func newDir(name string) *Dir {
+	return &Dir{
+		Name:    name,
+		Subdirs: map[string]*Dir{},
+		Files:   map[string]*File{},
+	}
 }
 
 func (d *Dir) Subdir(name string) *Dir {
@@ -39,7 +47,7 @@ func (d *Dir) PutFile(name string, contents []byte) (string, error) {
 		Revisions: []*Revision{},
 	}
 
-	d.Files = append(d.Files, f)
+	d.Files[name] = f
 
 	return f.PutRevision(contents), nil
 }

@@ -1,6 +1,11 @@
 package filesystem
 
-import "fmt"
+import (
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
+)
 
 type File struct {
 	Name      string
@@ -24,4 +29,24 @@ func (f *File) PutRevision(contents []byte) string {
 	})
 
 	return revisionName
+}
+
+func (f *File) GetRevision(revision string) ([]byte, error) {
+	var revisionNum int
+	var err error
+	if revision != "" {
+		strippedRevision := strings.TrimPrefix(revision, "r")
+		revisionNum, err = strconv.Atoi(strippedRevision)
+	} else {
+		revisionNum = len(f.Revisions)
+	}
+	if err != nil {
+		return nil, errors.New("no such revision")
+	}
+
+	if revisionNum <= 0 || revisionNum > len(f.Revisions) {
+		return nil, errors.New("no such revision")
+	}
+
+	return f.Revisions[revisionNum-1].Contents, nil
 }

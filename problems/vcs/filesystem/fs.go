@@ -2,22 +2,19 @@ package filesystem
 
 import (
 	"errors"
-	"path"
 	"sort"
-	"strings"
+	"sync"
 )
 
 type Filesystem struct {
 	Root *Dir
+
+	lock sync.Mutex
 }
 
 func NewFilesystem() *Filesystem {
 	return &Filesystem{
-		Root: &Dir{
-			Name:    "/",
-			Subdirs: []*Dir{},
-			Files:   []*File{},
-		},
+		Root: newDir(""),
 	}
 }
 
@@ -25,24 +22,16 @@ func checkFilename(name string) bool {
 	return name[0] == '/'
 }
 
-func (f *Filesystem) getDir(dir string, create bool) *Dir {
-	pathElements := strings.Split(dir, "/")
-
+func (f *Filesystem) getDir(path []string, create bool) *Dir {
 	currDir := f.Root
 
-	for _, curr := range pathElements {
-		nextDir := currDir.Subdir(curr)
-		if nextDir == nil {
-			if create {
-				nextDir = &Dir{
-					Name:    curr,
-					Subdirs: []*Dir{},
-					Files:   []*File{},
-				}
-				currDir.Subdirs = append(currDir.Subdirs, nextDir)
-			} else {
-				return nil
-			}
+	for _, curr := range path {
+		nextDir := currDir.Subdirs[curr]
+		if nextDir == nil && !create {
+			return nil
+		} else if nextDir == nil && create {
+			nextDir = newDir(curr)
+			currDir.Subdirs[curr] = nextDir
 		}
 		currDir = nextDir
 	}
@@ -51,15 +40,19 @@ func (f *Filesystem) getDir(dir string, create bool) *Dir {
 }
 
 func (f *Filesystem) List(dir string) (*ListResults, error) {
-	if !checkFilename(dir) {
-		return nil, errors.New("illegal dir name")
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	path, err := parseFilepath(dir)
+	if err != nil {
+		return nil, err
 	}
 
 	ret := &ListResults{
 		Items: []ListItem{},
 	}
 
-	currDir := f.getDir(dir, false)
+	currDir := f.getDir(path, false)
 
 	if currDir == nil {
 		return ret, nil
@@ -91,13 +84,40 @@ func (f *Filesystem) Put(name string, contents []byte) (string, error) {
 		return "", errors.New("illegal file name")
 	}
 
-	dirName, filename := path.Split(name)
+	f.lock.Lock()
+	defer f.lock.Unlock()
 
-	dir := f.getDir(dirName, true)
-	return dir.PutFile(filename, contents)
+	path, err := parseFilepath(name)
+	if err != nil {
+		return "", err
+	}
+
+	dir := f.getDir(path[:len(path)-1], true)
+	return dir.PutFile(path[len(path)-1], contents)
 }
 
 func (f *Filesystem) Get(name string, revision string) ([]byte, error) {
+	if !checkFilename(name) {
+		return nil, errors.New("illegal file name")
+	}
 
-	return nil, nil
+	f.lock.Lock()
+	defer f.lock.Unlock()
+
+	path, err := parseFilepath(name)
+	if err != nil {
+		return nil, err
+	}
+
+	dir := f.getDir(path[:len(path)-1], false)
+	if dir == nil {
+		return nil, errors.New("no such file")
+	}
+
+	file := dir.Files[path[len(path)-1]]
+	if file == nil {
+		return nil, errors.New("no such file")
+	}
+
+	return file.GetRevision(revision)
 }
