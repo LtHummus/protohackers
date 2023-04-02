@@ -91,6 +91,7 @@ func handlePut(conn net.Conn, reader io.Reader, parts []string) {
 
 	buf := make([]byte, length)
 	n, err := io.ReadFull(reader, buf)
+	log.Info().Int("n", n).Msg("read")
 	if err != nil {
 		log.Error().Err(err).Msg("could not read contents")
 		return
