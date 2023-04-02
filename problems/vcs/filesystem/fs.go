@@ -3,7 +3,9 @@ package filesystem
 import (
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog/log"
 	"sort"
+	"strings"
 	"sync"
 )
 
@@ -20,7 +22,7 @@ func NewFilesystem() *Filesystem {
 }
 
 func checkFilename(name string) bool {
-	return name[0] == '/'
+	return name[0] == '/' && !filenameOK(name) && name[len(name)-1] != '/'
 }
 
 func (f *Filesystem) getDir(path []string, create bool) *Dir {
@@ -82,6 +84,7 @@ func (f *Filesystem) List(dir string) (*ListResults, error) {
 
 func (f *Filesystem) Put(name string, contents []byte) (string, error) {
 	if !checkFilename(name) {
+		log.Warn().Str("name", name).Msg("illegal filename")
 		return "", errors.New("illegal file name")
 	}
 
@@ -121,4 +124,8 @@ func (f *Filesystem) Get(name string, revision string) ([]byte, error) {
 	}
 
 	return file.GetRevision(revision)
+}
+
+func filenameOK(name string) bool {
+	return strings.ContainsAny(name, "!\"#$%&'()*+=?@[]^`{|}~")
 }

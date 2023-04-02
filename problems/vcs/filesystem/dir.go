@@ -1,5 +1,7 @@
 package filesystem
 
+import "errors"
+
 type Dir struct {
 	Name string
 
@@ -36,6 +38,11 @@ func (d *Dir) File(name string) *File {
 }
 
 func (d *Dir) PutFile(name string, contents []byte) (string, error) {
+	for _, c := range contents {
+		if c < 9 || c > 13 && c < 32 || c > 127 {
+			return "", errors.New("text is binary")
+		}
+	}
 	currFile := d.File(name)
 	if currFile != nil {
 		r := currFile.PutRevision(contents)
