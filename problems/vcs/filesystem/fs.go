@@ -2,6 +2,7 @@ package filesystem
 
 import (
 	"errors"
+	"fmt"
 	"sort"
 	"sync"
 )
@@ -60,7 +61,7 @@ func (f *Filesystem) List(dir string) (*ListResults, error) {
 
 	for _, curr := range currDir.Subdirs {
 		ret.Items = append(ret.Items, ListItem{
-			Name:     curr.Name,
+			Name:     fmt.Sprintf("%s/", curr.Name),
 			Revision: "DIR",
 		})
 	}

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/lthummus/protohackers/problems/vcs/filesystem"
 	"github.com/rs/zerolog/log"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -44,7 +45,7 @@ func handleConnection(conn net.Conn) {
 		case "LIST":
 			handleList(conn, parts)
 		case "PUT":
-			handlePut(conn, parts)
+			handlePut(conn, reader, parts)
 		case "GET":
 			handleGet(conn, parts)
 		default:
@@ -73,7 +74,7 @@ func handleList(conn net.Conn, parts []string) {
 	conn.Write([]byte(fmt.Sprintf("%s", res.String())))
 }
 
-func handlePut(conn net.Conn, parts []string) {
+func handlePut(conn net.Conn, reader io.Reader, parts []string) {
 	if len(parts) != 3 {
 		conn.Write([]byte("ERR usage: PUT file length newline data\n"))
 		return
@@ -89,11 +90,14 @@ func handlePut(conn net.Conn, parts []string) {
 	log.Info().Str("name", filename).Int("len", length).Msg("putting file")
 
 	buf := make([]byte, length)
-	n, err := conn.Read(buf)
+	n, err := io.ReadFull(reader, buf)
 	if err != nil {
 		log.Error().Err(err).Msg("could not read contents")
 		return
 	}
+
+	log.Info().Int("bytes_read", n).Msg("read bytes")
+
 	if n != length {
 		log.Error().Err(err).Msg("could not read contents")
 		conn.Write([]byte("ERR insufficient data"))

@@ -3,6 +3,8 @@ package filesystem
 import (
 	"errors"
 	"fmt"
+	"github.com/rs/zerolog/log"
+	"reflect"
 	"strconv"
 	"strings"
 )
@@ -22,6 +24,14 @@ func (f *File) LatestRevisionName() string {
 }
 
 func (f *File) PutRevision(contents []byte) string {
+	if len(f.Revisions) != 0 {
+		lastRevision := f.Revisions[len(f.Revisions)-1]
+		if reflect.DeepEqual(lastRevision.Contents, contents) {
+			log.Warn().Msg("contents the same, not making new revision")
+			return fmt.Sprintf("r%d", len(f.Revisions))
+		}
+	}
+
 	revisionName := fmt.Sprintf("r%d", len(f.Revisions)+1)
 	f.Revisions = append(f.Revisions, &Revision{
 		Version:  revisionName,
