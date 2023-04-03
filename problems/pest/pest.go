@@ -1,6 +1,7 @@
 package pest
 
 import (
+	"bytes"
 	"fmt"
 	"github.com/lthummus/protohackers/problems/pest/protocol"
 	"github.com/rs/zerolog/log"
@@ -9,26 +10,30 @@ import (
 func RunPest(port int) {
 	log.Warn().Msg("to be implemented")
 
-	h := &protocol.SiteVisit{
+	h := &protocol.TargetPopulations{
 		Site: 12345,
-		Observations: []protocol.Observation{
+		Targets: []protocol.PopulationTarget{
 			{
-				Species: "dog",
-				Count:   1,
+				Species: "cat",
+				Min:     1,
+				Max:     4,
 			},
 			{
-				Species: "rat",
-				Count:   5,
+				Species: "dog",
+				Min:     5,
+				Max:     9,
 			},
 		},
 	}
 
-	s, err := h.Serialize()
+	payload, _ := h.Serialize()
+
+	r := bytes.NewReader(payload)
+
+	p, err := protocol.Deserialize(r)
 	if err != nil {
-		log.Panic().Err(err).Msg("could not serialize")
+		log.Panic().Err(err).Msg("could not deserialize")
 	}
 
-	log.Info().Hex("bytes", s).Msg("serialized")
-
-	fmt.Printf("%s\n", h.String())
+	fmt.Printf("%v\n", p)
 }
