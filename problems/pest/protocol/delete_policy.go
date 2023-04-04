@@ -3,6 +3,7 @@ package protocol
 import (
 	"encoding/binary"
 	"fmt"
+	"io"
 )
 
 type DeletePolicy struct {
@@ -17,5 +18,17 @@ func (d *DeletePolicy) Serialize() ([]byte, error) {
 	p := make([]byte, 4)
 	binary.BigEndian.PutUint32(p, d.Policy)
 
-	return wrapPayload(0x56, p), nil
+	return wrapPayload(MagicNumberDeletePolicy, p), nil
+}
+
+func deserializeDeletePolicy(r io.Reader) (Message, error) {
+	var policy uint32
+	err := binary.Read(r, binary.BigEndian, &policy)
+	if err != nil {
+		return nil, err
+	}
+
+	return &DeletePolicy{
+		Policy: policy,
+	}, nil
 }

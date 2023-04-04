@@ -1,5 +1,7 @@
 package protocol
 
+import "io"
+
 type Ok struct{}
 
 func (o *Ok) String() string {
@@ -7,5 +9,9 @@ func (o *Ok) String() string {
 }
 
 func (o *Ok) Serialize() ([]byte, error) {
-	return wrapPayload(0x52, []byte{}), nil
+	return wrapPayload(MagicNumberOK, []byte{}), nil
+}
+
+func deserializeOk(r io.Reader) (Message, error) {
+	return &Ok{}, nil
 }

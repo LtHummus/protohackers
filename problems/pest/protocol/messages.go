@@ -14,7 +14,7 @@ type Message interface {
 	Serialize() ([]byte, error)
 }
 
-type deserializationFunc func(header messageHeader, r io.Reader) (Message, error)
+type deserializationFunc func(r io.Reader) (Message, error)
 
 type messageHeader struct {
 	MagicNumber uint8
@@ -49,6 +49,10 @@ var deserializationMap = map[uint8]deserializationFunc{
 	MagicNumberOK:                deserializeOk,
 	MagicNumberDialAuthority:     deserializeDialAuthority,
 	MagicNumberTargetPopulations: deserializeTargetPopulations,
+	MagicNumberCreatePolicy:      deserializeCreatePolicy,
+	MagicNumberDeletePolicy:      deserializeDeletePolicy,
+	MagicNumberPolicyResult:      deserializePolicyResult,
+	MagicNumberSiteVisit:         deserializeSiteVisit,
 }
 
 func wrapPayload(magicNumber byte, payload []byte) []byte {
@@ -86,12 +90,17 @@ func Deserialize(r io.Reader) (Message, error) {
 
 	log.Debug().Uint8("magic_number", header.MagicNumber).Uint32("length", header.Length).Msg("read header")
 
+	payloadReader, err := makeWrapperAndComputeChecksum(header, r)
+	if err != nil {
+		return nil, err
+	}
+
 	f := deserializationMap[header.MagicNumber]
 	if f == nil {
 		return nil, errors.New("invalid magic number")
 	}
 
-	return f(header, r)
+	return f(payloadReader)
 }
 
 func makeWrapperAndComputeChecksum(header messageHeader, r io.Reader) (*bytes.Reader, error) {
@@ -112,112 +121,4 @@ func makeWrapperAndComputeChecksum(header messageHeader, r io.Reader) (*bytes.Re
 	}
 
 	return bytes.NewReader(buf), nil
-}
-
-func deserializeHello(header messageHeader, r io.Reader) (Message, error) {
-	packetWrapper, err := makeWrapperAndComputeChecksum(header, r)
-	if err != nil {
-		return nil, err
-	}
-
-	protocol, err := readString(packetWrapper)
-	if err != nil {
-		return nil, err
-	}
-
-	var version uint32
-	err = binary.Read(packetWrapper, binary.BigEndian, &version)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Hello{
-		Protocol: protocol,
-		Version:  version,
-	}, nil
-}
-
-func deserializeError(header messageHeader, r io.Reader) (Message, error) {
-	packetWrapper, err := makeWrapperAndComputeChecksum(header, r)
-	if err != nil {
-		return nil, err
-	}
-
-	message, err := readString(packetWrapper)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Error{
-		Message: message,
-	}, nil
-}
-
-func deserializeOk(header messageHeader, r io.Reader) (Message, error) {
-	_, err := makeWrapperAndComputeChecksum(header, r)
-	if err != nil {
-		return nil, err
-	}
-
-	return &Ok{}, nil
-}
-
-func deserializeDialAuthority(header messageHeader, r io.Reader) (Message, error) {
-	w, err := makeWrapperAndComputeChecksum(header, r)
-	if err != nil {
-		return nil, err
-	}
-
-	var site uint32
-	err = binary.Read(w, binary.BigEndian, &site)
-	if err != nil {
-		return nil, err
-	}
-
-	return &DialAuthority{
-		Site: site,
-	}, nil
-
-}
-
-func deserializeTargetPopulations(header messageHeader, r io.Reader) (Message, error) {
-	w, err := makeWrapperAndComputeChecksum(header, r)
-	if err != nil {
-		return nil, err
-	}
-
-	var site uint32
-	err = binary.Read(w, binary.BigEndian, &site)
-	if err != nil {
-		return nil, err
-	}
-
-	var ruleCount uint32
-	err = binary.Read(w, binary.BigEndian, &ruleCount)
-
-	targets := make([]PopulationTarget, ruleCount)
-	for i := range targets {
-		species, err := readString(w)
-		if err != nil {
-			return nil, err
-		}
-		var minMax struct {
-			Min uint32
-			Max uint32
-		}
-		err = binary.Read(w, binary.BigEndian, &minMax)
-		if err != nil {
-			return nil, err
-		}
-		targets[i] = PopulationTarget{
-			Species: species,
-			Min:     minMax.Min,
-			Max:     minMax.Max,
-		}
-	}
-
-	return &TargetPopulations{
-		Site:    site,
-		Targets: targets,
-	}, nil
 }

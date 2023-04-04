@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"fmt"
+	"io"
 )
 
 type Error struct {
@@ -13,5 +14,16 @@ func (e *Error) String() string {
 }
 
 func (e *Error) Serialize() ([]byte, error) {
-	return wrapPayload(0x51, serializeString(e.Message)), nil
+	return wrapPayload(MagicNumberError, serializeString(e.Message)), nil
+}
+
+func deserializeError(r io.Reader) (Message, error) {
+	message, err := readString(r)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Error{
+		Message: message,
+	}, nil
 }

@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -51,5 +52,39 @@ func (s *SiteVisit) Serialize() ([]byte, error) {
 		buf.Write(b)
 	}
 
-	return wrapPayload(0x58, buf.Bytes()), nil
+	return wrapPayload(MagicNumberSiteVisit, buf.Bytes()), nil
+}
+
+func deserializeSiteVisit(r io.Reader) (Message, error) {
+	var header struct {
+		Site     uint32
+		PopCount uint32
+	}
+
+	err := binary.Read(r, binary.BigEndian, &header)
+	if err != nil {
+		return nil, err
+	}
+
+	obs := make([]Observation, header.PopCount)
+	for i := range obs {
+		species, err := readString(r)
+		if err != nil {
+			return nil, err
+		}
+		var count uint32
+		err = binary.Read(r, binary.BigEndian, &count)
+		if err != nil {
+			return nil, err
+		}
+		obs[i] = Observation{
+			Species: species,
+			Count:   count,
+		}
+	}
+
+	return &SiteVisit{
+		Site:         header.Site,
+		Observations: obs,
+	}, nil
 }

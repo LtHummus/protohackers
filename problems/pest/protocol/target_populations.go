@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 	"strings"
 )
 
@@ -39,7 +40,7 @@ func (t *TargetPopulations) Serialize() ([]byte, error) {
 		buf.Write(s)
 	}
 
-	return wrapPayload(0x54, buf.Bytes()), nil
+	return wrapPayload(MagicNumberTargetPopulations, buf.Bytes()), nil
 }
 
 func (p *PopulationTarget) String() string {
@@ -53,4 +54,41 @@ func (p *PopulationTarget) Serialize() ([]byte, error) {
 	binary.Write(&buf, binary.BigEndian, p.Max)
 
 	return buf.Bytes(), nil
+}
+
+func deserializeTargetPopulations(r io.Reader) (Message, error) {
+	var site uint32
+	err := binary.Read(r, binary.BigEndian, &site)
+	if err != nil {
+		return nil, err
+	}
+
+	var ruleCount uint32
+	err = binary.Read(r, binary.BigEndian, &ruleCount)
+
+	targets := make([]PopulationTarget, ruleCount)
+	for i := range targets {
+		species, err := readString(r)
+		if err != nil {
+			return nil, err
+		}
+		var minMax struct {
+			Min uint32
+			Max uint32
+		}
+		err = binary.Read(r, binary.BigEndian, &minMax)
+		if err != nil {
+			return nil, err
+		}
+		targets[i] = PopulationTarget{
+			Species: species,
+			Min:     minMax.Min,
+			Max:     minMax.Max,
+		}
+	}
+
+	return &TargetPopulations{
+		Site:    site,
+		Targets: targets,
+	}, nil
 }

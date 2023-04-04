@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"io"
 )
 
 type Hello struct {
@@ -20,5 +21,23 @@ func (h *Hello) Serialize() ([]byte, error) {
 	buf.Write(serializeString(h.Protocol))
 	binary.Write(&buf, binary.BigEndian, h.Version)
 
-	return wrapPayload(0x50, buf.Bytes()), nil
+	return wrapPayload(MagicNumberHello, buf.Bytes()), nil
+}
+
+func deserializeHello(r io.Reader) (Message, error) {
+	protocol, err := readString(r)
+	if err != nil {
+		return nil, err
+	}
+
+	var version uint32
+	err = binary.Read(r, binary.BigEndian, &version)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Hello{
+		Protocol: protocol,
+		Version:  version,
+	}, nil
 }
