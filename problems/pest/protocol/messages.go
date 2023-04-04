@@ -32,6 +32,10 @@ func (mh *messageHeader) Sum() uint8 {
 }
 
 const (
+	MaxMessageLength = 1 * 1024 * 1024 // 1 megabyte
+)
+
+const (
 	MagicNumberHello             uint8 = 0x50
 	MagicNumberError             uint8 = 0x51
 	MagicNumberOK                uint8 = 0x52
@@ -90,10 +94,17 @@ func Deserialize(r io.Reader) (Message, error) {
 
 	log.Debug().Uint8("magic_number", header.MagicNumber).Uint32("length", header.Length).Msg("read header")
 
+	if header.Length > MaxMessageLength {
+		log.Warn().Uint32("length", header.Length).Msg("message is too long")
+		return nil, errors.New("message too long")
+	}
+
 	payloadReader, err := makeWrapperAndComputeChecksum(header, r)
 	if err != nil {
 		return nil, err
 	}
+
+	log.Debug().Msg("checksum + length check out")
 
 	f := deserializationMap[header.MagicNumber]
 	if f == nil {
