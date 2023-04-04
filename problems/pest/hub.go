@@ -77,15 +77,24 @@ func (h *Hub) HandleSiteVisit(site uint32, obs []protocol.Observation) error {
 		return err
 	}
 
+	obsMap := map[string]*protocol.Observation{}
 	for _, curr := range obs {
-		target := h.targets[site][curr.Species]
-		if target == nil {
-			log.Debug().Uint32("site", site).Str("species", curr.Species).Msg("skipping since no target exists")
-			continue
+		x := curr
+		obsMap[curr.Species] = &x
+	}
+	for species, target := range h.targets[site] {
+		log.Info().Uint32("site", site).Str("species", species).Msg("checking species")
+		curr := obsMap[species]
+		if curr == nil {
+			curr = &protocol.Observation{
+				Species: species,
+				Count:   0,
+			}
 		}
 
 		// delete old policy if it exists
-		if p := h.policies[site][curr.Species]; p != nil {
+		if p := h.policies[site][species]; p != nil {
+			log.Info().Uint32("site", site).Uint32("policy_id", p.id).Msg("deleting policy id")
 			err = h.connections[site].DeletePolicy(p.id)
 			if err != nil {
 				log.Error().Err(err).Msg("could not delete old policy")
@@ -95,13 +104,13 @@ func (h *Hub) HandleSiteVisit(site uint32, obs []protocol.Observation) error {
 		var action protocol.PolicyAction
 
 		if curr.Count < target.Min {
-			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("min", target.Min).Uint32("max", target.Max).Msg("should create conserve policy")
+			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("min", target.Min).Uint32("max", target.Max).Uint32("site", site).Msg("should create conserve policy")
 			action = protocol.Conserve
 		} else if curr.Count > target.Max {
-			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("max", target.Max).Uint32("max", target.Max).Msg("should create cull policy")
+			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("max", target.Max).Uint32("max", target.Max).Uint32("site", site).Msg("should create cull policy")
 			action = protocol.Cull
 		} else {
-			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("max", target.Max).Uint32("max", target.Max).Msg("should delete existing polciy if there is one")
+			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("max", target.Max).Uint32("max", target.Max).Uint32("site", site).Msg("should delete existing polciy if there is one")
 		}
 
 		if action != 0 {
