@@ -19,13 +19,15 @@ var (
 )
 
 type Site struct {
+	hub *Hub
+
 	Site    uint32
 	Targets map[string]*protocol.PopulationTarget
 
 	Conn net.Conn
 }
 
-func NewSite(site uint32) (*Site, error) {
+func NewSite(site uint32, hub *Hub) (*Site, error) {
 	log.Info().Uint32("site", site).Msg("starting site client")
 	conn, err := net.Dial("tcp", authorityServerAddress)
 	if err != nil {
@@ -74,7 +76,20 @@ func NewSite(site uint32) (*Site, error) {
 		targets[curr.Species] = &curr
 	}
 
+	go func(c net.Conn) {
+		buf := make([]byte, protocol.MaxMessageLength)
+		for {
+			_, err := conn.Read(buf)
+			if err != nil {
+				log.Warn().Uint32("site", site).Msg("disconnected")
+				hub.DeregisterSite(site)
+				return
+			}
+		}
+	}(conn)
+
 	return &Site{
+		hub:     hub,
 		Site:    site,
 		Targets: targets,
 		Conn:    conn,

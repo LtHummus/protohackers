@@ -22,11 +22,16 @@ func (h *Hub) GetOrQuerySite(site uint32) (*Site, error) {
 		return s, nil
 	}
 
-	cs, err := NewSite(site)
+	cs, err := NewSite(site, h)
 	if err != nil {
 		return nil, err
 	}
 
 	h.SiteMap[site] = cs
 	return cs, nil
+}
+
+func (h *Hub) DeregisterSite(site uint32) {
+	h.siteLock.Lock()
+	defer h.siteLock.Unlock()
 }
