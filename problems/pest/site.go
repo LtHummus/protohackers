@@ -19,9 +19,9 @@ var (
 )
 
 type Site struct {
-	hub *Hub
+	hub  *Hub
+	Site uint32
 
-	Site    uint32
 	Targets map[string]*protocol.PopulationTarget
 
 	Conn net.Conn
@@ -76,39 +76,66 @@ func NewSite(site uint32, hub *Hub) (*Site, error) {
 		targets[curr.Species] = &curr
 	}
 
-	go func(c net.Conn) {
-		buf := make([]byte, protocol.MaxMessageLength)
-		for {
-			_, err := conn.Read(buf)
-			if err != nil {
-				log.Warn().Uint32("site", site).Msg("disconnected")
-				hub.DeregisterSite(site)
-				return
-			}
-		}
-	}(conn)
-
 	return &Site{
 		hub:     hub,
 		Site:    site,
-		Targets: targets,
 		Conn:    conn,
+		Targets: targets,
 	}, nil
 }
 
-func (s *Site) HandleSiteVisit(obs []protocol.Observation) {
-	for _, curr := range obs {
-		target := s.Targets[curr.Species]
-		if target == nil {
-			continue
-		}
-
-		if curr.Count < target.Min {
-			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("min", target.Min).Uint32("max", target.Max).Msg("should create conserve policy")
-		} else if curr.Count > target.Max {
-			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("max", target.Max).Uint32("max", target.Max).Msg("should create cull policy")
-		} else {
-			log.Info().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("max", target.Max).Uint32("max", target.Max).Msg("should delete existing polciy if there is one")
-		}
+func (s *Site) CreatePolicy(species string, action protocol.PolicyAction) (uint32, error) {
+	p := &protocol.CreatePolicy{
+		Species: species,
+		Action:  action,
 	}
+
+	payload, err := p.Serialize()
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = s.Conn.Write(payload)
+	if err != nil {
+		return 0, err
+	}
+
+	resp, err := protocol.Deserialize(s.Conn)
+	if err != nil {
+		return 0, err
+	}
+
+	cPolicy, ok := resp.(*protocol.PolicyResult)
+	if !ok {
+		log.Warn().Type("response_type", resp).Msg("no policy result")
+		return 0, err
+	}
+
+	return cPolicy.Policy, nil
+
+}
+
+func (s *Site) DeletePolicy(id uint32) error {
+	payload, err := (&protocol.DeletePolicy{Policy: id}).Serialize()
+	if err != nil {
+		return err
+	}
+
+	_, err = s.Conn.Write(payload)
+	if err != nil {
+		return err
+	}
+
+	resp, err := protocol.Deserialize(s.Conn)
+	if err != nil {
+		return err
+	}
+
+	_, ok := resp.(*protocol.Ok)
+	if !ok {
+		log.Warn().Type("response_type", resp).Msg("could not confirm delete")
+		return err
+	}
+
+	return nil
 }

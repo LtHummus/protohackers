@@ -53,11 +53,10 @@ func (c *client) handleConnection() {
 		switch m := msg.(type) {
 		case *protocol.SiteVisit:
 			log.Info().Msg("got site visit")
-			s, err := c.hub.GetOrQuerySite(m.Site)
+			err := c.hub.HandleSiteVisit(m.Site, m.Observations)
 			if err != nil {
-				log.Error().Err(err).Uint32("site", m.Site).Msg("could not query site")
+				log.Fatal().Err(err).Msg("could not handle site visit")
 			}
-			s.HandleSiteVisit(m.Observations)
 		}
 	}
 }
