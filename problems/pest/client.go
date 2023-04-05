@@ -53,10 +53,9 @@ func (c *client) handleConnection() {
 		switch m := msg.(type) {
 		case *protocol.SiteVisit:
 			log.Info().Msg("got site visit")
-			err := c.hub.HandleSiteVisit(m.Site, m.Observations)
-			if err != nil {
-				log.Fatal().Err(err).Msg("could not handle site visit")
-			}
+			c.hub.visitChan <- m
+		default:
+			log.Fatal().Type("message_type", m).Msg("invalid type gotten from client")
 		}
 	}
 }
