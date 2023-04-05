@@ -1,6 +1,7 @@
 package pest
 
 import (
+	"fmt"
 	"github.com/lthummus/protohackers/problems/pest/protocol"
 	"github.com/rs/zerolog/log"
 	"net"
@@ -11,12 +12,27 @@ type client struct {
 	hub  *Hub
 }
 
+var (
+	helloPayload []byte
+)
+
+func init() {
+	helloPayload, _ = (&protocol.Hello{Protocol: "pestcontrol", Version: 1}).Serialize()
+}
+
 func (c *client) handleConnection() {
 	defer c.conn.Close()
 
 	firstMsg, err := protocol.Deserialize(c.conn)
+	_, herr := c.conn.Write(helloPayload)
+	if herr != nil {
+		log.Error().Err(err).Msg("could not write hello to client")
+	}
 	if err != nil {
 		log.Error().Err(err).Msg("error reading from client")
+		resp := &protocol.Error{Message: fmt.Sprintf("error: %s", err.Error())}
+		respBytes, _ := resp.Serialize()
+		c.conn.Write(respBytes)
 		return
 	}
 
@@ -37,12 +53,6 @@ func (c *client) handleConnection() {
 		return
 	}
 
-	resp, _ := (&protocol.Hello{Protocol: "pestcontrol", Version: 1}).Serialize()
-	_, err = c.conn.Write(resp)
-	if err != nil {
-		log.Error().Err(err).Msg("could not write hello to client")
-	}
-
 	for {
 		msg, err := protocol.Deserialize(c.conn)
 		if err != nil {
@@ -54,7 +64,7 @@ func (c *client) handleConnection() {
 
 		switch m := msg.(type) {
 		case *protocol.SiteVisit:
-			err = m.ValidateObservations()
+			obs, err := m.BuildMap()
 			if err != nil {
 				log.Warn().Err(err).Uint32("site", m.Site).Msg("invalid observation")
 				resp := &protocol.Error{Message: err.Error()}
@@ -62,7 +72,10 @@ func (c *client) handleConnection() {
 				c.conn.Write(respBytes)
 				continue
 			}
-			c.hub.visitChan <- m
+			c.hub.visitChan <- &Visit{
+				Site:         m.Site,
+				Observations: obs,
+			}
 		default:
 			log.Fatal().Type("message_type", m).Msg("invalid type gotten from client")
 		}

@@ -1,19 +1,23 @@
 package pest
 
 import (
-	"github.com/lthummus/protohackers/problems/pest/protocol"
 	"github.com/rs/zerolog/log"
 )
 
+type Visit struct {
+	Site         uint32
+	Observations map[string]uint32
+}
+
 type Hub struct {
 	connections map[uint32]*Site
-	visitChan   chan *protocol.SiteVisit
+	visitChan   chan *Visit
 }
 
 func NewHub() *Hub {
 	h := &Hub{
 		connections: map[uint32]*Site{},
-		visitChan:   make(chan *protocol.SiteVisit, 100),
+		visitChan:   make(chan *Visit, 1000),
 	}
 
 	go h.handleSiteVisit()
@@ -35,6 +39,7 @@ func (h *Hub) getSite(site uint32) (*Site, error) {
 		return nil, err
 	}
 
+	log.Info().Uint32("site", site).Msg("created site")
 	h.connections[site] = s
 
 	return s, nil

@@ -92,8 +92,6 @@ func Deserialize(r io.Reader) (Message, error) {
 		return nil, err
 	}
 
-	log.Debug().Uint8("magic_number", header.MagicNumber).Uint32("length", header.Length).Msg("read header")
-
 	if header.Length > MaxMessageLength {
 		log.Warn().Uint32("length", header.Length).Msg("message is too long")
 		return nil, errors.New("message too long")
@@ -104,14 +102,19 @@ func Deserialize(r io.Reader) (Message, error) {
 		return nil, err
 	}
 
-	log.Debug().Msg("checksum + length check out")
-
 	f := deserializationMap[header.MagicNumber]
 	if f == nil {
 		return nil, errors.New("invalid magic number")
 	}
 
-	return f(payloadReader)
+	m, err := f(payloadReader)
+	if err != nil {
+		log.Error().Err(err).Msg("error decoding message")
+		return nil, err
+	}
+	log.Debug().Stringer("message", m).Msg("decoded message")
+
+	return m, nil
 }
 
 func makeWrapperAndComputeChecksum(header messageHeader, r io.Reader) (*bytes.Reader, error) {

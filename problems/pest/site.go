@@ -5,6 +5,7 @@ import (
 	"github.com/lthummus/protohackers/problems/pest/protocol"
 	"github.com/rs/zerolog/log"
 	"net"
+	"sync"
 )
 
 const (
@@ -27,9 +28,11 @@ type Site struct {
 	Targets  map[string]*protocol.PopulationTarget
 	Policies map[string]*policy
 
-	Visits chan *protocol.SiteVisit
+	Visits chan *Visit
 
 	Conn net.Conn
+
+	lock sync.Mutex
 }
 
 func NewSite(site uint32, hub *Hub) (*Site, error) {
@@ -83,7 +86,8 @@ func NewSite(site uint32, hub *Hub) (*Site, error) {
 	targets := map[string]*protocol.PopulationTarget{}
 	for _, curr := range targetPopulations.Targets {
 		log.Info().Uint32("site", site).Str("species", curr.Species).Uint32("min", curr.Min).Uint32("max", curr.Max).Msg("got population target")
-		targets[curr.Species] = &curr
+		p := curr
+		targets[curr.Species] = &p
 	}
 
 	s := &Site{
@@ -92,7 +96,7 @@ func NewSite(site uint32, hub *Hub) (*Site, error) {
 		Conn:     conn,
 		Targets:  targets,
 		Policies: map[string]*policy{},
-		Visits:   make(chan *protocol.SiteVisit, 100),
+		Visits:   make(chan *Visit, 1000),
 	}
 
 	go s.visitHandler()
@@ -102,40 +106,34 @@ func NewSite(site uint32, hub *Hub) (*Site, error) {
 
 func (s *Site) visitHandler() {
 	for visit := range s.Visits {
+		log.Info().Uint32("site", s.Site).Msg("handling site visit")
 		if visit.Site != s.Site {
 			log.Panic().Uint32("site_visit_id", visit.Site).Uint32("site_id", s.Site).Msg("site id mismatch!")
 		}
 
-		obsMap := map[string]*protocol.Observation{}
-		for _, curr := range visit.Observations {
-			x := curr
-			obsMap[curr.Species] = &x
-		}
-
 		for species, target := range s.Targets {
 			log.Debug().Uint32("site", s.Site).Str("species", species).Msg("checking species")
-			curr := obsMap[species]
-			if curr == nil {
-				curr = &protocol.Observation{
-					Species: species,
-					Count:   0,
-				}
-			}
+			count := visit.Observations[species]
 
 			currPolicy := s.Policies[species]
 
 			var action protocol.PolicyAction
 			var actionStr string
-			if curr.Count < target.Min {
+			if count < target.Min {
 				action = protocol.Conserve
 				actionStr = "conserve"
-			} else if curr.Count > target.Max {
+			} else if count > target.Max {
 				action = protocol.Cull
 				actionStr = "cull"
+			} else {
+				actionStr = "inaction"
 			}
+
+			log.Info().Uint32("site", s.Site).Str("species", species).Str("action", actionStr).Uint32("count", count).Uint32("min", target.Min).Uint32("max", target.Max).Msg("policy determined")
 
 			if currPolicy != nil && currPolicy.action == action {
 				// same policy already exists, do nothing
+				log.Info().Uint32("site", s.Site).Str("species", species).Str("action", actionStr).Msg("policy already exists, skipping")
 				continue
 			}
 
@@ -145,6 +143,7 @@ func (s *Site) visitHandler() {
 				if err != nil {
 					log.Fatal().Err(err).Msg("could not delete policy")
 				}
+				log.Info().Uint32("site", s.Site).Str("species", species).Uint32("policy_id", currPolicy.id).Msg("deleting old policy")
 				delete(s.Policies, species)
 			}
 
