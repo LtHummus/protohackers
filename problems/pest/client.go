@@ -23,15 +23,17 @@ func (c *client) handleConnection() {
 	hi, ok := firstMsg.(*protocol.Hello)
 	if !ok {
 		log.Warn().Type("message_type", firstMsg).Msg("non-hello got as first message")
-		resp, _ := (&protocol.Error{Message: "non-hello message as preamble"}).Serialize()
-		c.conn.Write(resp)
+		resp := &protocol.Error{Message: "non-hello message as preamble"}
+		respBytes, _ := resp.Serialize()
+		c.conn.Write(respBytes)
 		return
 	}
 
 	if hi.Protocol != "pestcontrol" || hi.Version != 1 {
 		log.Warn().Str("protocol", hi.Protocol).Uint32("version", hi.Version).Msg("invalid protocol or version")
-		resp, _ := (&protocol.Error{Message: "invalid protocol or version"}).Serialize()
-		c.conn.Write(resp)
+		resp := &protocol.Error{Message: "non-hello message as preamble"}
+		respBytes, _ := resp.Serialize()
+		c.conn.Write(respBytes)
 		return
 	}
 
@@ -52,7 +54,14 @@ func (c *client) handleConnection() {
 
 		switch m := msg.(type) {
 		case *protocol.SiteVisit:
-			log.Info().Msg("got site visit")
+			err = m.ValidateObservations()
+			if err != nil {
+				log.Warn().Err(err).Uint32("site", m.Site).Msg("invalid observation")
+				resp := &protocol.Error{Message: err.Error()}
+				respBytes, _ := resp.Serialize()
+				c.conn.Write(respBytes)
+				continue
+			}
 			c.hub.visitChan <- m
 		default:
 			log.Fatal().Type("message_type", m).Msg("invalid type gotten from client")

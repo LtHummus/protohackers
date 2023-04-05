@@ -88,3 +88,17 @@ func deserializeSiteVisit(r io.Reader) (Message, error) {
 		Observations: obs,
 	}, nil
 }
+
+func (s *SiteVisit) ValidateObservations() error {
+	m := map[string]uint32{}
+	for _, curr := range s.Observations {
+		count, exists := m[curr.Species]
+		if exists && count != curr.Count {
+			return fmt.Errorf("conflicting observations: site %d, %s has both %d and %d", s.Site, curr.Species, count, curr.Count)
+		}
+
+		m[curr.Species] = curr.Count
+	}
+
+	return nil
+}

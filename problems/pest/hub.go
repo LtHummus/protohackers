@@ -5,10 +5,6 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-type policy struct {
-	id uint32
-}
-
 type Hub struct {
 	connections map[uint32]*Site
 	visitChan   chan *protocol.SiteVisit

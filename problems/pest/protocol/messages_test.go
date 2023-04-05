@@ -85,3 +85,67 @@ func TestDeserializeCreatePolicy(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
+
+func TestSiteVisit_ValidateObservations(t *testing.T) {
+	t.Run("simple", func(t *testing.T) {
+		v := &SiteVisit{
+			Site: 11111,
+			Observations: []Observation{
+				{
+					Species: "dog",
+					Count:   1,
+				},
+				{
+					Species: "cat",
+					Count:   2,
+				},
+			},
+		}
+
+		assert.NoError(t, v.ValidateObservations())
+	})
+
+	t.Run("repeats", func(t *testing.T) {
+		v := &SiteVisit{
+			Site: 12345,
+			Observations: []Observation{
+				{
+					Species: "dog",
+					Count:   1,
+				},
+				{
+					Species: "cat",
+					Count:   2,
+				},
+				{
+					Species: "dog",
+					Count:   1,
+				},
+			},
+		}
+
+		assert.NoError(t, v.ValidateObservations())
+	})
+
+	t.Run("conflict", func(t *testing.T) {
+		v := &SiteVisit{
+			Site: 1234,
+			Observations: []Observation{
+				{
+					Species: "dog",
+					Count:   1,
+				},
+				{
+					Species: "cat",
+					Count:   2,
+				},
+				{
+					Species: "dog",
+					Count:   3,
+				},
+			},
+		}
+
+		assert.Error(t, v.ValidateObservations())
+	})
+}

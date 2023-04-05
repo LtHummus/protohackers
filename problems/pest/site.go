@@ -15,12 +15,17 @@ var (
 	helloBytes, _ = (&protocol.Hello{Protocol: "pestcontrol", Version: 1}).Serialize()
 )
 
+type policy struct {
+	id     uint32
+	action protocol.PolicyAction
+}
+
 type Site struct {
 	hub  *Hub
 	Site uint32
 
 	Targets  map[string]*protocol.PopulationTarget
-	Policies map[string]*uint32
+	Policies map[string]*policy
 
 	Visits chan *protocol.SiteVisit
 
@@ -86,7 +91,7 @@ func NewSite(site uint32, hub *Hub) (*Site, error) {
 		Site:     site,
 		Conn:     conn,
 		Targets:  targets,
-		Policies: map[string]*uint32{},
+		Policies: map[string]*policy{},
 		Visits:   make(chan *protocol.SiteVisit, 100),
 	}
 
@@ -117,28 +122,30 @@ func (s *Site) visitHandler() {
 				}
 			}
 
-			if p := s.Policies[species]; p != nil {
-				err := s.DeletePolicy(*p)
-				if err != nil {
-					log.Error().Err(err).Uint32("policy_id", *p).Uint32("site", s.Site).Msg("could not delete old policy")
-				}
-
-				delete(s.Policies, species)
-				log.Info().Uint32("site", s.Site).Str("species", species).Uint32("policy_id", *p).Msg("deleted policy")
-			}
+			currPolicy := s.Policies[species]
 
 			var action protocol.PolicyAction
 			var actionStr string
 			if curr.Count < target.Min {
-				log.Debug().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("min", target.Min).Uint32("max", target.Max).Uint32("site", s.Site).Msg("should create conserve policy")
 				action = protocol.Conserve
 				actionStr = "conserve"
 			} else if curr.Count > target.Max {
-				log.Debug().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("max", target.Max).Uint32("max", target.Max).Uint32("site", s.Site).Msg("should create cull policy")
 				action = protocol.Cull
 				actionStr = "cull"
-			} else {
-				log.Debug().Str("species", curr.Species).Uint32("count", curr.Count).Uint32("max", target.Max).Uint32("max", target.Max).Uint32("site", s.Site).Msg("should delete existing polciy if there is one")
+			}
+
+			if currPolicy != nil && currPolicy.action == action {
+				// same policy already exists, do nothing
+				continue
+			}
+
+			// our policy is different (or new), so delete the old one
+			if currPolicy != nil {
+				err := s.DeletePolicy(currPolicy.id)
+				if err != nil {
+					log.Fatal().Err(err).Msg("could not delete policy")
+				}
+				delete(s.Policies, species)
 			}
 
 			if action != 0 {
@@ -148,7 +155,10 @@ func (s *Site) visitHandler() {
 					continue
 				}
 
-				s.Policies[species] = &policyId
+				s.Policies[species] = &policy{
+					id:     policyId,
+					action: action,
+				}
 				log.Info().Uint32("site", s.Site).Str("species", species).Str("action", actionStr).Uint32("policy_id", policyId).Msg("policy created")
 			}
 		}
