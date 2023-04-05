@@ -26,10 +26,11 @@ func (c *client) handleConnection() {
 	firstMsg, err := protocol.Deserialize(c.conn)
 	_, herr := c.conn.Write(helloPayload)
 	if herr != nil {
-		log.Error().Err(err).Msg("could not write hello to client")
+		log.Fatal().Err(err).Msg("could not write hello to client")
 	}
+	log.Debug().Msg("wrote hello")
 	if err != nil {
-		log.Error().Err(err).Msg("error reading from client")
+		log.Error().Err(err).Msg("error reading hello from client")
 		resp := &protocol.Error{Message: fmt.Sprintf("error: %s", err.Error())}
 		respBytes, _ := resp.Serialize()
 		c.conn.Write(respBytes)
@@ -53,10 +54,11 @@ func (c *client) handleConnection() {
 		return
 	}
 
+	var msg protocol.Message
 	for {
-		msg, err := protocol.Deserialize(c.conn)
+		msg, err = protocol.Deserialize(c.conn)
 		if err != nil {
-			log.Error().Err(err).Msg("could not read data")
+			log.Error().Err(err).Msg("could not read message in loop")
 			resp, _ := (&protocol.Error{Message: "invalid message"}).Serialize()
 			c.conn.Write(resp)
 			return

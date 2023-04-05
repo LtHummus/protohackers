@@ -32,7 +32,7 @@ func (mh *messageHeader) Sum() uint8 {
 }
 
 const (
-	MaxMessageLength = 1 * 1024 * 1024 // 1 megabyte
+	MaxMessageLength = 10 * 1024 * 1024 // 10 megabytes
 )
 
 const (
@@ -112,7 +112,7 @@ func Deserialize(r io.Reader) (Message, error) {
 		log.Error().Err(err).Msg("error decoding message")
 		return nil, err
 	}
-	log.Debug().Stringer("message", m).Msg("decoded message")
+	fmt.Printf("decoded message: %s\n", m.String())
 
 	return m, nil
 }
