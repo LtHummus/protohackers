@@ -32,7 +32,7 @@ func (mh *messageHeader) Sum() uint8 {
 }
 
 const (
-	MaxMessageLength = 10 * 1024 * 1024 // 10 megabytes
+	MaxMessageLength = 1 * 1024 * 1024 // 1 megabyte
 )
 
 const (

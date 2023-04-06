@@ -49,7 +49,10 @@ func (c *client) handleConnection() {
 	firstMsg, err := protocol.Deserialize(c.conn)
 	if err != nil {
 		log.Error().Err(err).Msg("error reading hello from client")
-		c.sendMessage(&protocol.Error{Message: fmt.Sprintf("could not deserialize: %s", err.Error())})
+		err = c.sendMessage(&protocol.Error{Message: fmt.Sprintf("could not deserialize: %s", err.Error())})
+		if err != nil {
+			log.Fatal().Err(err).Msg("could not send back failed hello")
+		}
 		return
 	}
 
