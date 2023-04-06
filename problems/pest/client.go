@@ -5,11 +5,14 @@ import (
 	"github.com/lthummus/protohackers/problems/pest/protocol"
 	"github.com/rs/zerolog/log"
 	"net"
+	"time"
 )
 
 type client struct {
 	conn net.Conn
 	hub  *Hub
+
+	id int64
 }
 
 var (
@@ -33,23 +36,23 @@ func (c *client) sendMessage(msg protocol.Message) error {
 		return err
 	}
 
+	log.Debug().Str("msg", msg.String()).Msg("message sent to client")
 	return nil
 }
 
 func (c *client) handleConnection() {
-	defer c.conn.Close()
-
+	c.conn.SetReadDeadline(time.Now().Add(15 * time.Second))
 	_, err := c.conn.Write(helloPayload)
 	if err != nil {
-		log.Error().Err(err).Msg("could not write hello to client")
+		log.Error().Err(err).Int64("client_id", c.id).Msg("could not write hello to client")
 		return
 	}
 	log.Debug().Msg("wrote hello")
 
 	firstMsg, err := protocol.Deserialize(c.conn)
 	if err != nil {
-		log.Error().Err(err).Msg("error reading hello from client")
-		err = c.sendMessage(&protocol.Error{Message: fmt.Sprintf("could not deserialize: %s", err.Error())})
+		log.Error().Err(err).Int64("client_id", c.id).Msg("error reading hello from client")
+		err = c.sendMessage(&protocol.Error{Message: fmt.Sprintf("invalid message (%d)", c.id)})
 		if err != nil {
 			log.Fatal().Err(err).Msg("could not send back failed hello")
 		}
@@ -58,15 +61,15 @@ func (c *client) handleConnection() {
 
 	hi, ok := firstMsg.(*protocol.Hello)
 	if !ok {
-		log.Warn().Type("message_type", firstMsg).Msg("non-hello got as first message")
-		resp := &protocol.Error{Message: "non-hello message as preamble"}
+		log.Warn().Type("message_type", firstMsg).Int64("client_id", c.id).Msg("non-hello got as first message")
+		resp := &protocol.Error{Message: fmt.Sprintf("non-hello message as preamble (%d)", c.id)}
 		c.sendMessage(resp)
 		return
 	}
 
 	if hi.Protocol != "pestcontrol" || hi.Version != 1 {
-		log.Warn().Str("protocol", hi.Protocol).Uint32("version", hi.Version).Msg("invalid protocol or version")
-		resp := &protocol.Error{Message: "invalid protocol or version"}
+		log.Warn().Str("protocol", hi.Protocol).Int64("client_id", c.id).Uint32("version", hi.Version).Msg("invalid protocol or version")
+		resp := &protocol.Error{Message: fmt.Sprintf("invalid protocol or version (%d)", c.id)}
 		c.sendMessage(resp)
 		return
 	}
@@ -75,8 +78,8 @@ func (c *client) handleConnection() {
 	for {
 		msg, err = protocol.Deserialize(c.conn)
 		if err != nil {
-			log.Error().Err(err).Msg("could not read message in loop")
-			resp := &protocol.Error{Message: fmt.Sprintf("invalid message: %s", err.Error())}
+			log.Error().Err(err).Int64("client_id", c.id).Msg("could not read message in loop")
+			resp := &protocol.Error{Message: fmt.Sprintf("invalid message (%d)", c.id)}
 			err = c.sendMessage(resp)
 			return
 		}
@@ -85,7 +88,7 @@ func (c *client) handleConnection() {
 		case *protocol.SiteVisit:
 			obs, err := m.BuildMap()
 			if err != nil {
-				log.Warn().Err(err).Uint32("site", m.Site).Msg("invalid observation")
+				log.Warn().Err(err).Int64("client_id", c.id).Uint32("site", m.Site).Msg("invalid observation")
 				resp := &protocol.Error{Message: err.Error()}
 				c.sendMessage(resp)
 				return
@@ -96,7 +99,7 @@ func (c *client) handleConnection() {
 			}
 		default:
 			c.sendMessage(&protocol.Error{Message: "invalid message type"})
-			log.Error().Type("message_type", m).Msg("invalid type gotten from client")
+			log.Error().Int64("client_id", c.id).Type("message_type", m).Msg("invalid type gotten from client")
 			return
 		}
 	}

@@ -3,6 +3,7 @@ package pest
 import (
 	"fmt"
 	"github.com/rs/zerolog/log"
+	"math/rand"
 	"net"
 )
 
@@ -24,7 +25,7 @@ func RunPest(port int) {
 
 		log.Info().Stringer("remote_address", conn.RemoteAddr()).Msg("accepted connection")
 
-		c := client{conn: conn, hub: h}
+		c := client{conn: conn, hub: h, id: rand.Int63()}
 
 		go c.handleConnection()
 	}

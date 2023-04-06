@@ -112,7 +112,6 @@ func Deserialize(r io.Reader) (Message, error) {
 		log.Error().Err(err).Msg("error decoding message")
 		return nil, err
 	}
-	fmt.Printf("decoded message: %s\n", m.String())
 
 	return m, nil
 }
