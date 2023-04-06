@@ -177,14 +177,14 @@ func (l *Listener) handleAckPacket(p *AckPacket, addr net.Addr) {
 		return
 	}
 
-	if conn.ackCount > conn.bytesSent {
+	if p.Length > conn.bytesSent {
 		// they got more data than we sent?!?
 		log.Warn().Int("ack_count", conn.ackCount).Int("packet_count", p.Length).Msg("more data claimed than accounted for")
 		l.sendPacket(&ClosePacket{Session: p.Session}, addr)
 		delete(l.connections, p.Session)
 		conn.setClose()
 	} else {
-		log.Info().Int("session", p.Session).Int("ack", p.Length).Msg("noting ack")
+		log.Info().Int("session", p.Session).Int("ack", p.Length).Int("ack_count", conn.ackCount).Msg("noting ack")
 		conn.sendLock.Lock()
 		defer conn.sendLock.Unlock()
 		newAck := p.Length - conn.ackCount
@@ -192,8 +192,9 @@ func (l *Listener) handleAckPacket(p *AckPacket, addr net.Addr) {
 		conn.lastAck = time.Now()
 		if newAck < 0 {
 			log.Error().Msg("negative ack count")
+		} else {
+			conn.sendBuff.Next(newAck)
 		}
-		conn.sendBuff.Next(newAck)
 		conn.retransmit()
 	}
 }
