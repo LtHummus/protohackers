@@ -3,10 +3,11 @@ package speeding
 import (
 	"encoding/binary"
 	"errors"
-	"github.com/rs/zerolog/log"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/rs/zerolog/log"
 )
 
 type Client struct {
@@ -32,7 +33,7 @@ func NewClient(system *System, conn net.Conn) *Client {
 func (c *Client) Run() {
 	msgKind := make([]byte, 1)
 	defer c.conn.Close()
-
+	
 	for {
 		var err error
 		_, err = c.conn.Read(msgKind)

@@ -3,10 +3,11 @@ package speeding
 import (
 	"bytes"
 	"encoding/binary"
-	"github.com/rs/zerolog/log"
 	"math"
 	"sort"
 	"sync"
+
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -89,9 +90,9 @@ func (s *System) checkForTickets(plate string, road uint16) {
 		diff := speed - limit
 
 		// this may need to be tweaked
-		if diff > 0 {
+		if diff > 0.1 {
 			officialSpeed := uint16(math.Round(speed * 100))
-			log.Info().Uint16("road", road).Uint16("speed", officialSpeed).Msg("issuing ticket")
+			log.Info().Uint16("road", road).Uint16("speed", officialSpeed).Str("plate", plate).Msg("issuing ticket")
 			s.issueTicket(plate, road, a.mileMarker, a.timestamp, b.mileMarker, b.timestamp, officialSpeed)
 		}
 	}
@@ -127,7 +128,7 @@ func (s *System) issueTicket(plate string, road uint16, mile1 uint16, timestamp1
 
 	payload := buf.Bytes()
 
-	log.Info().Hex("payload", payload).Msg("generated ticket")
+	log.Debug().Hex("payload", payload).Msg("generated ticket")
 
 	// guaranteed to exist at this point since it's created with the camera
 	s.roadChannels[road] <- payload

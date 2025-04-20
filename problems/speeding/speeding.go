@@ -2,8 +2,9 @@ package speeding
 
 import (
 	"fmt"
-	"github.com/rs/zerolog/log"
 	"net"
+
+	"github.com/rs/zerolog/log"
 )
 
 func RunSpeeding(port int) {
